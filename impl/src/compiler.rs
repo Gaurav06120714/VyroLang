@@ -43,6 +43,7 @@ fn native_id(name: &str) -> Option<usize> {
         "upper" => 13,
         "lower" => 14,
         "type" => 15,
+        "input" => 16,
         _ => return None,
     })
 }

@@ -8,6 +8,14 @@ All notable changes to the Vyro Ecosystem are documented here. Format based on [
 - Analyzed existing repos (VyroCoding, VyroOs) and re-based the plan on reality: VyroCoding is the built IDE/Cloud/AI platform (evolve, not rebuild); VyroOs is a built OS (reference). Updated Component Map statuses and Dependency Graph reuse mapping.
 
 ### Added
+- **VyroLang runs in VyroCoding on the native VyroVM** (Judge0 bypassed for `.vy`):
+  added an `input()` native to the language; added a Vyro execution service +
+  language dispatcher in VyroCoding's API (`Language.Vyro`, `runner.service.ts`,
+  `vyro.service.ts`), wired into the BullMQ worker and run/submit routes, with a
+  starter template in the language picker. See
+  [VyroCoding Integration](docs/10-cloud/VYROCODING_INTEGRATION.md). New
+  `examples/sum_stdin.vy`. Verified end to end (accepted / wrong_answer /
+  compile_error / runtime_error).
 - **Language core expanded:** arrays (literals, indexing, index-assignment), a standard
   library of built-ins (`len`, `push`, `pop`, `str`, `int`, `float`, `abs`, `sqrt`,
   `floor`, `ceil`, `pow`, `min`, `max`, `upper`, `lower`, `type`), string indexing, and

@@ -68,7 +68,7 @@ Full diagrams: [System Architecture](./docs/01-architecture/SYSTEM_ARCHITECTURE.
 - **IDE** — [VyroIDE](./docs/07-ide/VYRO_IDE.md)
 - **AI** — [VyroAI](./docs/08-ai/VYRO_AI.md)
 - **Applications** — [Reference Apps](./docs/09-applications/REFERENCE_APPS.md)
-- **Cloud** — [VyroCloud](./docs/10-cloud/VYRO_CLOUD.md)
+- **Cloud** — [VyroCloud](./docs/10-cloud/VYRO_CLOUD.md) · [VyroCoding Integration](./docs/10-cloud/VYROCODING_INTEGRATION.md)
 - **Security** — [Security Model](./docs/11-security/SECURITY_MODEL.md)
 - **Deployment** — [VPS Deployment](./docs/12-deployment/VPS_DEPLOYMENT.md)
 - **CI/CD** — [Pipeline](./docs/13-cicd/CICD.md)

@@ -48,7 +48,9 @@ The parser is recursive-descent with precedence-climbing for expressions. The co
 - **Classes**: fields, `init`, methods, `self`, instantiation `User(...)`, property
   get/set, and method calls (including method-to-method via `self.m()`).
 - **Standard library** (built-ins): `print`, `len`, `push`, `pop`, `str`, `int`,
-  `float`, `abs`, `sqrt`, `floor`, `ceil`, `pow`, `min`, `max`, `upper`, `lower`, `type`.
+  `float`, `abs`, `sqrt`, `floor`, `ceil`, `pow`, `min`, `max`, `upper`, `lower`, `type`,
+  and `input()` (reads one line from stdin; `null` at EOF — used for competitive I/O
+  and by the [VyroCoding integration](../docs/10-cloud/VYROCODING_INTEGRATION.md)).
 - String indexing (`"hi"[0]`) and `len` on strings.
 - Comments: `// line` and `/* block */`.
 - Optional type annotations (`: Type`, `-> Type`) are parsed and currently ignored.

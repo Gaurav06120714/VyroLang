@@ -676,6 +676,22 @@ impl Vm {
                 nargs(1, "type")?;
                 Ok(Value::Str(Rc::new(args[0].type_name().to_string())))
             }
+            16 => {
+                // input(): read one line from stdin; null at EOF
+                nargs(0, "input")?;
+                use std::io::BufRead;
+                let mut line = String::new();
+                let n = std::io::stdin()
+                    .lock()
+                    .read_line(&mut line)
+                    .map_err(|e| self.rt_err(format!("input() failed: {}", e)))?;
+                if n == 0 {
+                    Ok(Value::Null)
+                } else {
+                    let trimmed = line.trim_end_matches(['\n', '\r']);
+                    Ok(Value::Str(Rc::new(trimmed.to_string())))
+                }
+            }
             _ => Err(self.rt_err(format!("unknown native function #{}", id))),
         }
     }
