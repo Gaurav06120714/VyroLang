@@ -8,6 +8,8 @@ All notable changes to the Vyro Ecosystem are documented here. Format based on [
 - Analyzed existing repos (VyroCoding, VyroOs) and re-based the plan on reality: VyroCoding is the built IDE/Cloud/AI platform (evolve, not rebuild); VyroOs is a built OS (reference). Updated Component Map statuses and Dependency Graph reuse mapping.
 
 ### Added
+- **`impl/` — first working Vyro toolchain (Rust):** lexer → parser → bytecode compiler → stack VM, exposed as the `vyro` CLI (`run` / `check` / `version`). Supports variables, Int/Float/Bool/String/null, arithmetic + string concat, comparisons, short-circuit `&&`/`||`, `if/else if/else`, `while`, `for i in a..b`, functions with recursion and first-class values, and `print`. 12 end-to-end tests passing.
+- `examples/` — runnable VyroLang programs: `hello.vy`, `fib.vy`, `loops.vy` (factorial + FizzBuzz).
 - `docs/00-overview/EXISTING_REPO_ANALYSIS.md` — analysis + integration plan for VyroCoding and VyroOs.
 - Complete ecosystem planning and specification set.
 - Architecture documents: system architecture, component map, dependency graph, scalability strategy.

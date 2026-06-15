@@ -88,7 +88,7 @@ Engineering rules and conventions: [CONTRIBUTING](./CONTRIBUTING.md) · [Securit
 
 ## Status
 
-**Phase 1 — Architecture & Specification.** This repo currently holds the complete plan. Implementation milestones are tracked in [ROADMAP.md](./ROADMAP.md).
+**Phase 2 — Toolchain in progress.** Architecture and specs are complete, and a **first working Vyro toolchain** (lexer → parser → bytecode compiler → stack VM) now lives in [`impl/`](./impl) — run real programs with `vyro run examples/hello.vy`. See the [implementation README](./impl/README.md). Milestones tracked in [ROADMAP.md](./ROADMAP.md).
 
 ---
 
