@@ -41,9 +41,22 @@ pub enum Op {
     JumpIfFalsePeek(usize),  // jumps if top falsey, leaves it (for &&)
     JumpIfTruePeek(usize),   // jumps if top truthy, leaves it (for ||)
 
+    // Collections
+    NewArray(usize), // pop n elements, push an array
+    IndexGet,        // arr, idx -> value
+    IndexSet,        // arr, idx, value -> value (value left on stack)
+
+    // Objects / classes
+    Class(usize),    // name const -> push empty class
+    Method(usize),   // name const: pop func, attach to class on top of stack
+    GetProp(usize),  // name const: instance -> field value
+    SetProp(usize),  // name const: instance, value -> value (left on stack)
+    Invoke(usize, usize), // method name const, argc: method call on receiver
+
     // Calls
     Call(usize),    // argc; callee is below the args on the stack
     Print(usize),   // native: argc values, prints space-separated + newline
+    Native(usize, usize), // native id, argc
     Return,
 }
 

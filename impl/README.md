@@ -36,17 +36,24 @@ cargo build --release
 
 The parser is recursive-descent with precedence-climbing for expressions. The compiler emits stack bytecode (clox-style locals + globals, call frames). The VM is a stack machine with call frames and a global table.
 
-## Language supported in v0.1
+## Language supported
 
 - `let` / `const` bindings (top-level → globals; in-scope → locals), assignment.
-- Types: `Int`, `Float`, `Bool`, `String`, `null`.
+- Types: `Int`, `Float`, `Bool`, `String`, `Array`, `null`, plus user **classes**.
 - Operators: `+ - * / %`, comparisons, `&& || !` (short-circuit), unary `-`.
 - `+` does numeric add or string concatenation (`"x = " + 5`).
 - Control flow: `if / else if / else`, `while`, `for i in a..b`.
 - Functions with parameters, recursion, `return`; first-class function values.
-- `print(...)` builtin (space-separated, newline).
+- **Arrays**: literals `[1, 2, 3]`, indexing `a[i]`, index assignment `a[i] = x`.
+- **Classes**: fields, `init`, methods, `self`, instantiation `User(...)`, property
+  get/set, and method calls (including method-to-method via `self.m()`).
+- **Standard library** (built-ins): `print`, `len`, `push`, `pop`, `str`, `int`,
+  `float`, `abs`, `sqrt`, `floor`, `ceil`, `pow`, `min`, `max`, `upper`, `lower`, `type`.
+- String indexing (`"hi"[0]`) and `len` on strings.
 - Comments: `// line` and `/* block */`.
 - Optional type annotations (`: Type`, `-> Type`) are parsed and currently ignored.
+
+See [`examples/todo.vy`](../examples/todo.vy) for a program using all of the above.
 
 ## Tests
 

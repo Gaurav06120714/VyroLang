@@ -8,6 +8,12 @@ All notable changes to the Vyro Ecosystem are documented here. Format based on [
 - Analyzed existing repos (VyroCoding, VyroOs) and re-based the plan on reality: VyroCoding is the built IDE/Cloud/AI platform (evolve, not rebuild); VyroOs is a built OS (reference). Updated Component Map statuses and Dependency Graph reuse mapping.
 
 ### Added
+- **Language core expanded:** arrays (literals, indexing, index-assignment), a standard
+  library of built-ins (`len`, `push`, `pop`, `str`, `int`, `float`, `abs`, `sqrt`,
+  `floor`, `ceil`, `pow`, `min`, `max`, `upper`, `lower`, `type`), string indexing, and
+  **classes** (fields, `init`, methods, `self`, property get/set, method calls). VM call
+  convention reworked to clox-style frames (slot 0 = callee/`self`) to support methods.
+  25 tests passing (`tests/run.rs`, `tests/features.rs`). New `examples/todo.vy`.
 - **`impl/` — first working Vyro toolchain (Rust):** lexer → parser → bytecode compiler → stack VM, exposed as the `vyro` CLI (`run` / `check` / `version`). Supports variables, Int/Float/Bool/String/null, arithmetic + string concat, comparisons, short-circuit `&&`/`||`, `if/else if/else`, `while`, `for i in a..b`, functions with recursion and first-class values, and `print`. 12 end-to-end tests passing.
 - `examples/` — runnable VyroLang programs: `hello.vy`, `fib.vy`, `loops.vy` (factorial + FizzBuzz).
 - `docs/00-overview/EXISTING_REPO_ANALYSIS.md` — analysis + integration plan for VyroCoding and VyroOs.

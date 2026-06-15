@@ -73,6 +73,7 @@ impl Parser {
         match self.peek().clone() {
             Tok::Let | Tok::Const => self.let_stmt(),
             Tok::Func => self.func_stmt(),
+            Tok::Class => self.class_stmt(),
             Tok::If => self.if_stmt(),
             Tok::While => self.while_stmt(),
             Tok::For => self.for_stmt(),
@@ -118,6 +119,54 @@ impl Parser {
         }
         let body = self.block()?;
         Ok(Stmt::Func { name, params, body })
+    }
+
+    fn class_stmt(&mut self) -> Result<Stmt, String> {
+        self.advance(); // class
+        let name = self.ident_name("class name")?;
+        self.expect(&Tok::LBrace, "'{'")?;
+        let mut methods = Vec::new();
+        while !self.check(&Tok::RBrace) && !self.check(&Tok::Eof) {
+            if self.check(&Tok::Func) {
+                self.advance(); // func
+                let mname = self.ident_name("method name")?;
+                self.expect(&Tok::LParen, "'('")?;
+                let mut params = Vec::new();
+                if !self.check(&Tok::RParen) {
+                    loop {
+                        let p = self.ident_name("parameter name")?;
+                        if self.accept(&Tok::Colon) {
+                            let _ = self.ident_name("type name")?;
+                        }
+                        params.push(p);
+                        if !self.accept(&Tok::Comma) {
+                            break;
+                        }
+                    }
+                }
+                self.expect(&Tok::RParen, "')'")?;
+                if self.accept(&Tok::Arrow) {
+                    let _ = self.ident_name("return type")?;
+                }
+                let body = self.block()?;
+                methods.push(Method { name: mname, params, body });
+            } else if matches!(self.peek(), Tok::Ident(_)) {
+                // bare field declaration: `name` or `name: Type` (recorded implicitly)
+                let _ = self.ident_name("field name")?;
+                if self.accept(&Tok::Colon) {
+                    let _ = self.ident_name("type name")?;
+                }
+                self.accept(&Tok::Semicolon);
+            } else {
+                return Err(format!(
+                    "line {}: expected method or field in class body, found {:?}",
+                    self.line(),
+                    self.peek()
+                ));
+            }
+        }
+        self.expect(&Tok::RBrace, "'}'")?;
+        Ok(Stmt::Class { name, methods })
     }
 
     fn if_stmt(&mut self) -> Result<Stmt, String> {
@@ -166,17 +215,19 @@ impl Parser {
     }
 
     fn expr_or_assign(&mut self) -> Result<Stmt, String> {
-        // assignment: IDENT '=' expr  (but not '==')
-        if let Tok::Ident(name) = self.peek().clone() {
-            if self.toks[self.pos + 1].tok == Tok::Assign {
-                self.advance(); // ident
-                self.advance(); // =
-                let value = self.expression()?;
-                self.accept(&Tok::Semicolon);
-                return Ok(Stmt::Assign { name, value });
-            }
-        }
         let e = self.expression()?;
+        if self.accept(&Tok::Assign) {
+            let value = self.expression()?;
+            self.accept(&Tok::Semicolon);
+            return match e {
+                Expr::Var(name) => Ok(Stmt::Assign { name, value }),
+                Expr::Index { obj, index } => {
+                    Ok(Stmt::IndexAssign { obj: *obj, index: *index, value })
+                }
+                Expr::Get { obj, name } => Ok(Stmt::PropAssign { obj: *obj, name, value }),
+                _ => Err(format!("line {}: invalid assignment target", self.line())),
+            };
+        }
         self.accept(&Tok::Semicolon);
         Ok(Stmt::ExprStmt(e))
     }
@@ -285,11 +336,46 @@ impl Parser {
                 self.advance();
                 Ok(Expr::Unary { op: UnOp::Not, expr: Box::new(self.unary()?) })
             }
-            _ => self.primary(),
+            _ => self.postfix(),
         }
     }
 
-    fn primary(&mut self) -> Result<Expr, String> {
+    fn postfix(&mut self) -> Result<Expr, String> {
+        let mut e = self.atom()?;
+        loop {
+            match self.peek() {
+                Tok::Dot => {
+                    self.advance();
+                    let name = self.ident_name("property or method name")?;
+                    if self.accept(&Tok::LParen) {
+                        let mut args = Vec::new();
+                        if !self.check(&Tok::RParen) {
+                            loop {
+                                args.push(self.expression()?);
+                                if !self.accept(&Tok::Comma) {
+                                    break;
+                                }
+                            }
+                        }
+                        self.expect(&Tok::RParen, "')'")?;
+                        e = Expr::MethodCall { obj: Box::new(e), name, args };
+                    } else {
+                        e = Expr::Get { obj: Box::new(e), name };
+                    }
+                }
+                Tok::LBracket => {
+                    self.advance();
+                    let index = self.expression()?;
+                    self.expect(&Tok::RBracket, "']'")?;
+                    e = Expr::Index { obj: Box::new(e), index: Box::new(index) };
+                }
+                _ => break,
+            }
+        }
+        Ok(e)
+    }
+
+    fn atom(&mut self) -> Result<Expr, String> {
         match self.advance() {
             Tok::Int(n) => Ok(Expr::Int(n)),
             Tok::Float(f) => Ok(Expr::Float(f)),
@@ -301,6 +387,19 @@ impl Parser {
                 let e = self.expression()?;
                 self.expect(&Tok::RParen, "')'")?;
                 Ok(e)
+            }
+            Tok::LBracket => {
+                let mut elems = Vec::new();
+                if !self.check(&Tok::RBracket) {
+                    loop {
+                        elems.push(self.expression()?);
+                        if !self.accept(&Tok::Comma) {
+                            break;
+                        }
+                    }
+                }
+                self.expect(&Tok::RBracket, "']'")?;
+                Ok(Expr::Array(elems))
             }
             Tok::Ident(name) => {
                 if self.accept(&Tok::LParen) {

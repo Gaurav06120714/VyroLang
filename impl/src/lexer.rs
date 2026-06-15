@@ -150,6 +150,7 @@ impl<'a> Lexer<'a> {
             "let" => Tok::Let,
             "const" => Tok::Const,
             "func" => Tok::Func,
+            "class" => Tok::Class,
             "if" => Tok::If,
             "else" => Tok::Else,
             "while" => Tok::While,
@@ -171,6 +172,8 @@ impl<'a> Lexer<'a> {
             b')' => Tok::RParen,
             b'{' => Tok::LBrace,
             b'}' => Tok::RBrace,
+            b'[' => Tok::LBracket,
+            b']' => Tok::RBracket,
             b',' => Tok::Comma,
             b';' => Tok::Semicolon,
             b'+' => Tok::Plus,
@@ -239,7 +242,7 @@ impl<'a> Lexer<'a> {
                     self.bump();
                     Tok::DotDot
                 } else {
-                    return Err(format!("line {}: unexpected '.'", line));
+                    Tok::Dot
                 }
             }
             other => {

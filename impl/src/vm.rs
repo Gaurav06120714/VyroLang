@@ -1,10 +1,11 @@
 //! The VyroVM: a stack-based bytecode interpreter with call frames.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::opcode::Op;
-use crate::value::{Function, Value};
+use crate::value::{Class, Function, Instance, Value};
 
 struct Frame {
     func: Rc<Function>,
@@ -160,6 +161,131 @@ impl Vm {
                     self.out.push('\n');
                     self.stack.push(Value::Null);
                 }
+                Op::NewArray(n) => {
+                    let start = self.stack.len() - n;
+                    let elems: Vec<Value> = self.stack.drain(start..).collect();
+                    self.stack.push(Value::Array(Rc::new(RefCell::new(elems))));
+                }
+                Op::IndexGet => {
+                    let idx = self.pop();
+                    let obj = self.pop();
+                    let v = self.index_get(&obj, &idx)?;
+                    self.stack.push(v);
+                }
+                Op::IndexSet => {
+                    let val = self.pop();
+                    let idx = self.pop();
+                    let obj = self.pop();
+                    self.index_set(&obj, &idx, val.clone())?;
+                    self.stack.push(val);
+                }
+                Op::Class(i) => {
+                    let name = self.name_const(i);
+                    let class = Class { name, methods: HashMap::new() };
+                    self.stack.push(Value::Class(Rc::new(class)));
+                }
+                Op::Method(i) => {
+                    let name = self.name_const(i);
+                    let func = match self.pop() {
+                        Value::Func(f) => f,
+                        _ => return Err(self.rt_err("method value is not a function")),
+                    };
+                    match self.stack.last() {
+                        Some(Value::Class(c)) => {
+                            // The class is still being defined; rebuild it with the new method.
+                            let mut methods = c.methods.clone();
+                            methods.insert(name, func);
+                            let new_class =
+                                Rc::new(Class { name: c.name.clone(), methods });
+                            *self.stack.last_mut().unwrap() = Value::Class(new_class);
+                        }
+                        _ => return Err(self.rt_err("Method opcode without a class on the stack")),
+                    }
+                }
+                Op::GetProp(i) => {
+                    let name = self.name_const(i);
+                    let obj = self.pop();
+                    match obj {
+                        Value::Instance(inst) => {
+                            let v = inst.borrow().fields.get(&name).cloned();
+                            match v {
+                                Some(val) => self.stack.push(val),
+                                None => {
+                                    return Err(self.rt_err(format!(
+                                        "undefined property '{}'",
+                                        name
+                                    )))
+                                }
+                            }
+                        }
+                        other => {
+                            return Err(self.rt_err(format!(
+                                "cannot read property '{}' of {}",
+                                name,
+                                other.type_name()
+                            )))
+                        }
+                    }
+                }
+                Op::SetProp(i) => {
+                    let name = self.name_const(i);
+                    let val = self.pop();
+                    let obj = self.pop();
+                    match obj {
+                        Value::Instance(inst) => {
+                            inst.borrow_mut().fields.insert(name, val.clone());
+                            self.stack.push(val);
+                        }
+                        other => {
+                            return Err(self.rt_err(format!(
+                                "cannot set property '{}' of {}",
+                                name,
+                                other.type_name()
+                            )))
+                        }
+                    }
+                }
+                Op::Invoke(name_i, argc) => {
+                    let name = self.name_const(name_i);
+                    let recv_idx = self.stack.len() - argc - 1;
+                    let recv = self.stack[recv_idx].clone();
+                    match recv {
+                        Value::Instance(inst) => {
+                            let class = inst.borrow().class.clone();
+                            match class.methods.get(&name) {
+                                Some(m) => {
+                                    if m.arity != argc {
+                                        return Err(self.rt_err(format!(
+                                            "method '{}' expects {} argument(s), got {}",
+                                            name, m.arity, argc
+                                        )));
+                                    }
+                                    let base = recv_idx; // slot 0 = receiver (self)
+                                    self.frames.push(Frame { func: m.clone(), ip: 0, base });
+                                }
+                                None => {
+                                    return Err(self.rt_err(format!(
+                                        "undefined method '{}' on {}",
+                                        name, class.name
+                                    )))
+                                }
+                            }
+                        }
+                        other => {
+                            return Err(self.rt_err(format!(
+                                "cannot call method '{}' on {}",
+                                name,
+                                other.type_name()
+                            )))
+                        }
+                    }
+                }
+                Op::Native(id, argc) => {
+                    let start = self.stack.len() - argc;
+                    let args: Vec<Value> = self.stack.drain(start..).collect();
+                    let result = self.call_native(id, args)?;
+                    self.stack.push(result);
+                }
                 Op::Call(argc) => {
                     let callee_idx = self.stack.len() - argc - 1;
                     let callee = self.stack[callee_idx].clone();
@@ -171,8 +297,40 @@ impl Vm {
                                     f.name, f.arity, argc
                                 )));
                             }
-                            let base = self.stack.len() - argc;
-                            self.frames.push(Frame { func: f, ip: 0, base });
+                            self.frames.push(Frame { func: f, ip: 0, base: callee_idx });
+                        }
+                        Value::Class(c) => {
+                            let instance = Rc::new(RefCell::new(Instance {
+                                class: c.clone(),
+                                fields: HashMap::new(),
+                            }));
+                            match c.methods.get("init") {
+                                Some(init) => {
+                                    if init.arity != argc {
+                                        return Err(self.rt_err(format!(
+                                            "{}.init expects {} argument(s), got {}",
+                                            c.name, init.arity, argc
+                                        )));
+                                    }
+                                    // put the instance in the slot-0 (self) position
+                                    self.stack[callee_idx] = Value::Instance(instance);
+                                    self.frames.push(Frame {
+                                        func: init.clone(),
+                                        ip: 0,
+                                        base: callee_idx,
+                                    });
+                                }
+                                None => {
+                                    if argc != 0 {
+                                        return Err(self.rt_err(format!(
+                                            "class {} has no init but was called with {} argument(s)",
+                                            c.name, argc
+                                        )));
+                                    }
+                                    self.stack.truncate(callee_idx);
+                                    self.stack.push(Value::Instance(instance));
+                                }
+                            }
                         }
                         other => {
                             return Err(self.rt_err(format!("'{}' is not callable", other.type_name())))
@@ -187,8 +345,8 @@ impl Vm {
                         self.stack.clear();
                         return Ok(());
                     }
-                    // drop locals, args, and the callee slot
-                    self.stack.truncate(frame.base - 1);
+                    // drop locals, args, and the callee/self slot
+                    self.stack.truncate(frame.base);
                     self.stack.push(ret);
                 }
             }
@@ -313,5 +471,212 @@ impl Vm {
         };
         self.stack.push(Value::Bool(pick(ord)));
         Ok(())
+    }
+
+    // ---- Collections ----
+
+    fn as_index(&self, v: &Value) -> Result<usize, String> {
+        match v {
+            Value::Int(n) if *n >= 0 => Ok(*n as usize),
+            Value::Int(n) => Err(self.rt_err(format!("negative index {}", n))),
+            other => Err(self.rt_err(format!("index must be Int, got {}", other.type_name()))),
+        }
+    }
+
+    fn index_get(&self, obj: &Value, idx: &Value) -> Result<Value, String> {
+        let i = self.as_index(idx)?;
+        match obj {
+            Value::Array(a) => {
+                let b = a.borrow();
+                b.get(i)
+                    .cloned()
+                    .ok_or_else(|| self.rt_err(format!("array index {} out of bounds (len {})", i, b.len())))
+            }
+            Value::Str(s) => {
+                let ch = s.chars().nth(i);
+                ch.map(|c| Value::Str(Rc::new(c.to_string())))
+                    .ok_or_else(|| self.rt_err(format!("string index {} out of bounds", i)))
+            }
+            other => Err(self.rt_err(format!("{} is not indexable", other.type_name()))),
+        }
+    }
+
+    fn index_set(&self, obj: &Value, idx: &Value, val: Value) -> Result<(), String> {
+        let i = self.as_index(idx)?;
+        match obj {
+            Value::Array(a) => {
+                let mut b = a.borrow_mut();
+                if i >= b.len() {
+                    return Err(self.rt_err(format!(
+                        "array index {} out of bounds (len {})",
+                        i,
+                        b.len()
+                    )));
+                }
+                b[i] = val;
+                Ok(())
+            }
+            other => Err(self.rt_err(format!("cannot index-assign {}", other.type_name()))),
+        }
+    }
+
+    // ---- Native (built-in) functions; ids must match `compiler::native_id` ----
+
+    fn call_native(&self, id: usize, args: Vec<Value>) -> Result<Value, String> {
+        let nargs = |want: usize, name: &str| -> Result<(), String> {
+            if args.len() != want {
+                Err(self.rt_err(format!("{}() expects {} argument(s), got {}", name, want, args.len())))
+            } else {
+                Ok(())
+            }
+        };
+        let as_f64 = |v: &Value| -> Result<f64, String> {
+            match v {
+                Value::Int(n) => Ok(*n as f64),
+                Value::Float(f) => Ok(*f),
+                other => Err(self.rt_err(format!("expected a number, got {}", other.type_name()))),
+            }
+        };
+        match id {
+            0 => {
+                // len
+                nargs(1, "len")?;
+                match &args[0] {
+                    Value::Array(a) => Ok(Value::Int(a.borrow().len() as i64)),
+                    Value::Str(s) => Ok(Value::Int(s.chars().count() as i64)),
+                    other => Err(self.rt_err(format!("len() needs Array or String, got {}", other.type_name()))),
+                }
+            }
+            1 => {
+                // push(array, value)
+                nargs(2, "push")?;
+                match &args[0] {
+                    Value::Array(a) => {
+                        a.borrow_mut().push(args[1].clone());
+                        Ok(Value::Null)
+                    }
+                    other => Err(self.rt_err(format!("push() needs an Array, got {}", other.type_name()))),
+                }
+            }
+            2 => {
+                // pop(array)
+                nargs(1, "pop")?;
+                match &args[0] {
+                    Value::Array(a) => Ok(a.borrow_mut().pop().unwrap_or(Value::Null)),
+                    other => Err(self.rt_err(format!("pop() needs an Array, got {}", other.type_name()))),
+                }
+            }
+            3 => {
+                nargs(1, "str")?;
+                Ok(Value::Str(Rc::new(args[0].to_string())))
+            }
+            4 => {
+                // int
+                nargs(1, "int")?;
+                match &args[0] {
+                    Value::Int(n) => Ok(Value::Int(*n)),
+                    Value::Float(f) => Ok(Value::Int(*f as i64)),
+                    Value::Bool(b) => Ok(Value::Int(if *b { 1 } else { 0 })),
+                    Value::Str(s) => s
+                        .trim()
+                        .parse::<i64>()
+                        .map(Value::Int)
+                        .map_err(|_| self.rt_err(format!("int() cannot parse '{}'", s))),
+                    other => Err(self.rt_err(format!("int() cannot convert {}", other.type_name()))),
+                }
+            }
+            5 => {
+                // float
+                nargs(1, "float")?;
+                match &args[0] {
+                    Value::Int(n) => Ok(Value::Float(*n as f64)),
+                    Value::Float(f) => Ok(Value::Float(*f)),
+                    Value::Str(s) => s
+                        .trim()
+                        .parse::<f64>()
+                        .map(Value::Float)
+                        .map_err(|_| self.rt_err(format!("float() cannot parse '{}'", s))),
+                    other => Err(self.rt_err(format!("float() cannot convert {}", other.type_name()))),
+                }
+            }
+            6 => {
+                // abs
+                nargs(1, "abs")?;
+                match &args[0] {
+                    Value::Int(n) => Ok(Value::Int(n.abs())),
+                    Value::Float(f) => Ok(Value::Float(f.abs())),
+                    other => Err(self.rt_err(format!("abs() needs a number, got {}", other.type_name()))),
+                }
+            }
+            7 => {
+                nargs(1, "sqrt")?;
+                Ok(Value::Float(as_f64(&args[0])?.sqrt()))
+            }
+            8 => {
+                // floor
+                nargs(1, "floor")?;
+                match &args[0] {
+                    Value::Int(n) => Ok(Value::Int(*n)),
+                    Value::Float(f) => Ok(Value::Int(f.floor() as i64)),
+                    other => Err(self.rt_err(format!("floor() needs a number, got {}", other.type_name()))),
+                }
+            }
+            9 => {
+                // ceil
+                nargs(1, "ceil")?;
+                match &args[0] {
+                    Value::Int(n) => Ok(Value::Int(*n)),
+                    Value::Float(f) => Ok(Value::Int(f.ceil() as i64)),
+                    other => Err(self.rt_err(format!("ceil() needs a number, got {}", other.type_name()))),
+                }
+            }
+            10 => {
+                // pow(base, exp)
+                nargs(2, "pow")?;
+                match (&args[0], &args[1]) {
+                    (Value::Int(b), Value::Int(e)) if *e >= 0 => {
+                        Ok(Value::Int(b.pow(*e as u32)))
+                    }
+                    _ => Ok(Value::Float(as_f64(&args[0])?.powf(as_f64(&args[1])?))),
+                }
+            }
+            11 | 12 => {
+                // min / max
+                let name = if id == 11 { "min" } else { "max" };
+                if args.is_empty() {
+                    return Err(self.rt_err(format!("{}() needs at least one argument", name)));
+                }
+                let mut best = as_f64(&args[0])?;
+                let mut best_v = args[0].clone();
+                for a in &args[1..] {
+                    let x = as_f64(a)?;
+                    let take = if id == 11 { x < best } else { x > best };
+                    if take {
+                        best = x;
+                        best_v = a.clone();
+                    }
+                }
+                Ok(best_v)
+            }
+            13 => {
+                nargs(1, "upper")?;
+                match &args[0] {
+                    Value::Str(s) => Ok(Value::Str(Rc::new(s.to_uppercase()))),
+                    other => Err(self.rt_err(format!("upper() needs a String, got {}", other.type_name()))),
+                }
+            }
+            14 => {
+                nargs(1, "lower")?;
+                match &args[0] {
+                    Value::Str(s) => Ok(Value::Str(Rc::new(s.to_lowercase()))),
+                    other => Err(self.rt_err(format!("lower() needs a String, got {}", other.type_name()))),
+                }
+            }
+            15 => {
+                nargs(1, "type")?;
+                Ok(Value::Str(Rc::new(args[0].type_name().to_string())))
+            }
+            _ => Err(self.rt_err(format!("unknown native function #{}", id))),
+        }
     }
 }

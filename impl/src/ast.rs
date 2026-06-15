@@ -8,10 +8,14 @@ pub enum Expr {
     Bool(bool),
     Null,
     Var(String),
+    Array(Vec<Expr>),
+    Index { obj: Box<Expr>, index: Box<Expr> },
+    Get { obj: Box<Expr>, name: String },
     Unary { op: UnOp, expr: Box<Expr> },
     Binary { op: BinOp, lhs: Box<Expr>, rhs: Box<Expr> },
     Logical { op: LogOp, lhs: Box<Expr>, rhs: Box<Expr> },
     Call { name: String, args: Vec<Expr> },
+    MethodCall { obj: Box<Expr>, name: String, args: Vec<Expr> },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -42,14 +46,24 @@ pub enum LogOp {
 }
 
 #[derive(Debug, Clone)]
+pub struct Method {
+    pub name: String,
+    pub params: Vec<String>,
+    pub body: Vec<Stmt>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Let { name: String, value: Expr },
     Assign { name: String, value: Expr },
+    IndexAssign { obj: Expr, index: Expr, value: Expr },
+    PropAssign { obj: Expr, name: String, value: Expr },
     ExprStmt(Expr),
     If { cond: Expr, then: Vec<Stmt>, els: Vec<Stmt> },
     While { cond: Expr, body: Vec<Stmt> },
     For { var: String, start: Expr, end: Expr, body: Vec<Stmt> },
     Func { name: String, params: Vec<String>, body: Vec<Stmt> },
+    Class { name: String, methods: Vec<Method> },
     Return(Option<Expr>),
 }
 

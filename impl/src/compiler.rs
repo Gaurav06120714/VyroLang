@@ -15,12 +15,36 @@ struct FuncState {
     chunk: Chunk,
     locals: Vec<Local>,
     scope_depth: i32,
+    is_init: bool,
 }
 
 impl FuncState {
     fn new() -> Self {
-        FuncState { chunk: Chunk::new(), locals: Vec::new(), scope_depth: 0 }
+        FuncState { chunk: Chunk::new(), locals: Vec::new(), scope_depth: 0, is_init: false }
     }
+}
+
+/// Native (built-in) functions, keyed by source name. Ids must match `vm.rs`.
+fn native_id(name: &str) -> Option<usize> {
+    Some(match name {
+        "len" => 0,
+        "push" => 1,
+        "pop" => 2,
+        "str" => 3,
+        "int" => 4,
+        "float" => 5,
+        "abs" => 6,
+        "sqrt" => 7,
+        "floor" => 8,
+        "ceil" => 9,
+        "pow" => 10,
+        "min" => 11,
+        "max" => 12,
+        "upper" => 13,
+        "lower" => 14,
+        "type" => 15,
+        _ => return None,
+    })
 }
 
 pub struct Compiler {
@@ -196,7 +220,7 @@ impl Compiler {
                 self.end_scope();
             }
             Stmt::Func { name, params, body } => {
-                let func = self.compile_function(name, params, body)?;
+                let func = self.compile_callable(name, params, body, false)?;
                 let c = self.add_const(Value::Func(Rc::new(func)));
                 self.emit(Op::Const(c));
                 match self.declare(name) {
@@ -204,11 +228,48 @@ impl Compiler {
                     None => { /* local function */ 0 }
                 };
             }
+            Stmt::Class { name, methods } => {
+                let name_c = self.add_const(Value::Str(Rc::new(name.clone())));
+                self.emit(Op::Class(name_c));
+                for m in methods {
+                    let is_init = m.name == "init";
+                    let func = self.compile_callable(&m.name, &m.params, &m.body, true)?;
+                    if is_init {
+                        // arity excludes the implicit `self`
+                    }
+                    let fc = self.add_const(Value::Func(Rc::new(func)));
+                    self.emit(Op::Const(fc));
+                    let mc = self.add_const(Value::Str(Rc::new(m.name.clone())));
+                    self.emit(Op::Method(mc));
+                }
+                // the class is now on top of the stack
+                if let Some(g) = self.declare(name) {
+                    self.emit(Op::DefineGlobal(g));
+                }
+            }
+            Stmt::IndexAssign { obj, index, value } => {
+                self.expr(obj)?;
+                self.expr(index)?;
+                self.expr(value)?;
+                self.emit(Op::IndexSet);
+                self.emit(Op::Pop);
+            }
+            Stmt::PropAssign { obj, name, value } => {
+                self.expr(obj)?;
+                self.expr(value)?;
+                let nc = self.add_const(Value::Str(Rc::new(name.clone())));
+                self.emit(Op::SetProp(nc));
+                self.emit(Op::Pop);
+            }
             Stmt::Return(opt) => {
                 match opt {
                     Some(e) => self.expr(e)?,
                     None => {
-                        self.emit(Op::Null);
+                        if self.cur().is_init {
+                            self.emit(Op::GetLocal(0)); // init returns self
+                        } else {
+                            self.emit(Op::Null);
+                        }
                     }
                 }
                 self.emit(Op::Return);
@@ -217,14 +278,21 @@ impl Compiler {
         Ok(())
     }
 
-    fn compile_function(
+    fn compile_callable(
         &mut self,
         name: &str,
         params: &[String],
         body: &[Stmt],
+        is_method: bool,
     ) -> Result<Function, String> {
-        self.stack.push(FuncState::new());
+        let mut fs = FuncState::new();
+        fs.is_init = is_method && name == "init";
+        self.stack.push(fs);
         self.begin_scope();
+        // slot 0 is reserved: `self` for methods, an unnamed slot (the callee) for functions
+        let depth = self.cur().scope_depth;
+        let slot0 = if is_method { "self" } else { "" };
+        self.cur().locals.push(Local { name: slot0.to_string(), depth });
         for p in params {
             let depth = self.cur().scope_depth;
             self.cur().locals.push(Local { name: p.clone(), depth });
@@ -232,8 +300,12 @@ impl Compiler {
         for st in body {
             self.stmt(st)?;
         }
-        // implicit return null
-        self.emit(Op::Null);
+        // implicit return: self for init, else null
+        if self.cur().is_init {
+            self.emit(Op::GetLocal(0));
+        } else {
+            self.emit(Op::Null);
+        }
         self.emit(Op::Return);
         let fs = self.stack.pop().unwrap();
         Ok(Function { name: name.to_string(), arity: params.len(), chunk: fs.chunk })
@@ -311,12 +383,41 @@ impl Compiler {
                     }
                 }
             }
+            Expr::Array(elems) => {
+                for el in elems {
+                    self.expr(el)?;
+                }
+                self.emit(Op::NewArray(elems.len()));
+            }
+            Expr::Index { obj, index } => {
+                self.expr(obj)?;
+                self.expr(index)?;
+                self.emit(Op::IndexGet);
+            }
+            Expr::Get { obj, name } => {
+                self.expr(obj)?;
+                let nc = self.add_const(Value::Str(Rc::new(name.clone())));
+                self.emit(Op::GetProp(nc));
+            }
+            Expr::MethodCall { obj, name, args } => {
+                self.expr(obj)?; // receiver -> becomes self at the call frame base
+                for a in args {
+                    self.expr(a)?;
+                }
+                let nc = self.add_const(Value::Str(Rc::new(name.clone())));
+                self.emit(Op::Invoke(nc, args.len()));
+            }
             Expr::Call { name, args } => {
                 if name == "print" {
                     for a in args {
                         self.expr(a)?;
                     }
                     self.emit(Op::Print(args.len()));
+                } else if let Some(id) = native_id(name) {
+                    for a in args {
+                        self.expr(a)?;
+                    }
+                    self.emit(Op::Native(id, args.len()));
                 } else {
                     // push callee, then args
                     if let Some(slot) = self.resolve_local(name) {
