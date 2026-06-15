@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  docs-lint:
+    name: Docs & Markdown lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for broken relative links (basic)
+        run: |
+          echo "Validating markdown files exist and are non-empty..."
+          fail=0
+          while IFS= read -r f; do
+            if [ ! -s "$f" ]; then echo "Empty file: $f"; fail=1; fi
+          done < <(find . -name '*.md' -not -path './.git/*')
+          exit $fail
+
+  # Placeholder jobs for when implementation lands (see docs/13-cicd/CICD.md)
+  build-test:
+    name: Build & Test (enabled once code lands)
+    runs-on: ubuntu-latest
+    if: ${{ false }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --workspace
+      - run: cargo test --workspace
+      - run: cargo clippy -- -D warnings
+      - run: cargo fmt --check

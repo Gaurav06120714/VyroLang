@@ -1,0 +1,38 @@
+# Build outputs
+/target/
+/dist/
+/build/
+*.o
+*.out
+*.vbc        # Vyro bytecode artifacts
+
+# Node / IDE / Cloud
+node_modules/
+.next/
+.turbo/
+coverage/
+
+# Python tooling
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs & temp
+*.log
+tmp/
+.cache/
