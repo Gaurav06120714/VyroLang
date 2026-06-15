@@ -58,7 +58,7 @@ Full diagrams: [System Architecture](./docs/01-architecture/SYSTEM_ARCHITECTURE.
 
 ## Documentation Index
 
-- **Overview** — [Ecosystem](./docs/00-overview/ECOSYSTEM.md) · [Vision](./docs/00-overview/VISION.md) · [Glossary](./docs/00-overview/GLOSSARY.md)
+- **Overview** — [Ecosystem](./docs/00-overview/ECOSYSTEM.md) · [Vision](./docs/00-overview/VISION.md) · [Glossary](./docs/00-overview/GLOSSARY.md) · [Existing Repo Analysis](./docs/00-overview/EXISTING_REPO_ANALYSIS.md)
 - **Architecture** — [System](./docs/01-architecture/SYSTEM_ARCHITECTURE.md) · [Components](./docs/01-architecture/COMPONENT_MAP.md) · [Dependencies](./docs/01-architecture/DEPENDENCY_GRAPH.md) · [Scalability](./docs/01-architecture/SCALABILITY.md)
 - **Language** — [VyroLang Spec](./docs/02-vyrolang/LANGUAGE_SPEC.md)
 - **Compiler** — [Compiler Design](./docs/03-compiler/COMPILER_DESIGN.md)

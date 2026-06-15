@@ -4,7 +4,11 @@ All notable changes to the Vyro Ecosystem are documented here. Format based on [
 
 ## [Unreleased]
 
+### Changed
+- Analyzed existing repos (VyroCoding, VyroOs) and re-based the plan on reality: VyroCoding is the built IDE/Cloud/AI platform (evolve, not rebuild); VyroOs is a built OS (reference). Updated Component Map statuses and Dependency Graph reuse mapping.
+
 ### Added
+- `docs/00-overview/EXISTING_REPO_ANALYSIS.md` — analysis + integration plan for VyroCoding and VyroOs.
 - Complete ecosystem planning and specification set.
 - Architecture documents: system architecture, component map, dependency graph, scalability strategy.
 - Component designs: VyroLang, Compiler, VM, OS layer, vpm, IDE, AI, Cloud.

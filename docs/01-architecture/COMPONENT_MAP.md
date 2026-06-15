@@ -4,21 +4,24 @@ A directory of every component, its repository home, its language, and what it d
 
 ## Components
 
+Statuses reflect the real state after analyzing the existing repos — see [Existing Repo Analysis](../00-overview/EXISTING_REPO_ANALYSIS.md).
+
 | Component | Repo | Language | Status | Depends on |
 |---|---|---|---|---|
 | VyroLang (spec) | VyroLang | — | Spec | — |
-| VyroCompiler | VyroCoding | Rust | Planned | VyroLang spec |
-| VyroVM | VyroCoding | Rust | Planned | Compiler (bytecode) |
-| VyroOS Layer | VyroOs | Rust | Research | VM |
-| vpm | VyroCoding | Rust | Planned | Compiler, Registry |
-| Registry | VyroCloud (svc) | TypeScript | Planned | PostgreSQL |
-| VyroIDE | VyroCloud (web) | TS/Next.js | Planned | Compiler API, AI |
-| VyroAI | VyroCloud (svc) | TS/Python | Planned | Model provider |
-| VyroCloud | VyroCloud (svc) | TypeScript | Planned | Sandbox, DB |
-| VyroDeploy | VyroCloud (svc) | TypeScript | Planned | Cloud, Nginx |
-| Sandbox runner | VyroCloud (infra) | Docker/Rust | Planned | VM, VyroOS |
+| VyroCompiler | (new) | Rust | **Greenfield** | VyroLang spec |
+| VyroVM | (new) | Rust | **Greenfield** | Compiler (bytecode) |
+| vpm | (new) | Rust | **Greenfield** | Compiler, Registry |
+| VyroIDE | VyroCoding `apps/web` | TS/Next.js 15 | **Built — evolve** | Compiler API, AI |
+| VyroAI | VyroCoding `apps/api` `/ai/*` | TS (SSE) | **Built — evolve** | Model provider |
+| VyroCloud (exec) | VyroCoding `apps/api`+`apps/collab` | TS (BullMQ/Redis) | **Built — evolve** | Sandbox, DB |
+| Realtime collab | VyroCoding `apps/collab` | TS (WebSocket) | **Built** | Redis Pub/Sub |
+| Registry | (new) | TypeScript | Planned | PostgreSQL |
+| VyroDeploy | (new) | TypeScript | Planned | Cloud, Nginx |
+| Sandbox runner | (new) | Docker/Rust | Planned | VM, VyroOS |
+| VyroOS (capability layer) | VyroOs | C/ASM (real OS) | **Built — referenced** | VM (contract) |
 
-> Note: VyroCloud, VyroIDE, VyroDeploy, VyroAI, and Registry are services/web apps that will live together in a `VyroCloud` repo (to be created); the compiler/VM/vpm evolve inside `VyroCoding`; OS work in `VyroOs`.
+> Reality check: **VyroCoding** already implements the IDE/Cloud/AI/collab layers (Next.js 15 + Fastify + WebSocket + BullMQ; executes via Judge0) — evolve it rather than build new. **VyroOs** is a real, mature OS (from-scratch microkernel with net + TLS stack, plus Ubuntu remix and Linux-core paths, v7.3) — reference it; keep the capability layer as the thin sandbox contract. The genuinely new work is **VyroLang + Compiler + VM + vpm**.
 
 ## Logical Layers
 

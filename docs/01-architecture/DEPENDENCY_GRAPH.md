@@ -42,14 +42,19 @@ Each item depends only on those above it:
 
 ## Reuse Mapping (existing repos → ecosystem)
 
+Based on the [Existing Repo Analysis](../00-overview/EXISTING_REPO_ANALYSIS.md). VyroCoding is a built platform (not a compiler); VyroOs is a built OS.
+
 | Existing asset | Reused as | Action |
 |---|---|---|
-| VyroCoding: language experiments | Basis for VyroLang grammar | Consolidate into spec |
-| VyroCoding: compiler prototypes | Compiler frontend foundation | Refactor into staged pipeline |
-| VyroCoding: runtime code | VyroVM seed | Extract opcodes/heap |
-| VyroOs: kernel/system research | VyroOS capability layer | Wrap as host-abstraction API |
+| VyroCoding `apps/web` (Monaco, stores, theme, panels) | VyroIDE base | Adopt; add `.vy` grammar + LSP |
+| VyroCoding `apps/api` execution queue (BullMQ/Redis) | VyroCloud exec | Adopt; swap Judge0 → VyroVM sandbox runner |
+| VyroCoding `apps/collab` (WebSocket) + Redis Pub/Sub | Realtime/Scalability | Adopt directly |
+| VyroCoding `/ai/*` SSE gateway | VyroAI base | Adopt; ground in compiler symbol table |
+| VyroCoding JWT auth, rate-limit, Docker Compose, CI | Platform baseline | Adopt |
+| VyroOs (microkernel, drivers, net/TLS stack, FAT32) | VyroOS — real OS | Reference; keep capability layer as sandbox contract |
+| VyroOs Path A/B installable images | Native deploy target (future) | Optional: run platform on VyroOS Core |
 
-> Rule: **reuse before rebuild.** Each reuse item gets a migration note in its PR (see [CONTRIBUTING](../../CONTRIBUTING.md)).
+> Rule: **reuse before rebuild.** Each reuse item gets a migration note in its PR (see [CONTRIBUTING](../../CONTRIBUTING.md)). The only true greenfield work is VyroLang + Compiler + VM + vpm.
 
 ## External Dependencies
 
