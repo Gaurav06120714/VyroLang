@@ -7,7 +7,7 @@
 
 use std::process::exit;
 
-use vyro::{compile_source, run_source};
+use vyro::{compile_source, run_source, server};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -40,6 +40,13 @@ fn main() {
                 }
             }
         }
+        "serve" => {
+            let port: u16 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(8787);
+            if let Err(e) = server::serve(port) {
+                eprintln!("server error: {}", e);
+                exit(70);
+            }
+        }
         other => {
             eprintln!("unknown command: {}", other);
             usage();
@@ -53,6 +60,7 @@ fn usage() {
     eprintln!("usage:");
     eprintln!("  vyro run <file.vy>     compile and execute");
     eprintln!("  vyro check <file.vy>   parse + compile only");
+    eprintln!("  vyro serve [port]      start the Compiler API + VyroIDE (default 8787)");
     eprintln!("  vyro version");
 }
 

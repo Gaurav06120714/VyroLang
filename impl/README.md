@@ -20,7 +20,30 @@ cargo build --release
 |---|---|
 | `vyro run <file.vy>` | Compile and execute |
 | `vyro check <file.vy>` | Parse + compile only (diagnostics, no execution) |
+| `vyro serve [port]` | Start the Compiler API + VyroIDE (default `8787`) |
 | `vyro version` | Print version |
+
+## Run the whole stack (your own pipeline)
+
+This realizes the architecture diagram end-to-end in this one repo — no external platform:
+
+```bash
+cargo run --release -- serve 8787
+# open http://localhost:8787  →  your VyroIDE in the browser
+```
+
+```
+Browser ─▶ VyroIDE (web/index.html) ─▶ Compiler API (src/server.rs)
+        ─▶ VyroCompiler ─▶ Bytecode ─▶ VyroVM (sandboxed: instruction + time limits)
+```
+
+Sandboxed in a container (the "Docker Sandbox / Linux VPS" layer):
+
+```bash
+./scripts/sandbox-run.sh        # builds the image, runs with CPU/RAM/PID limits, read-only fs, cap-drop
+```
+
+API endpoints: `GET /` (IDE), `GET /health`, `POST /api/run` `{code, stdin}`, `POST /api/compile` `{code}`.
 
 ## Pipeline (maps 1:1 to the design docs)
 

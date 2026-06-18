@@ -1,8 +1,9 @@
 //! The VyroVM: a stack-based bytecode interpreter with call frames.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::rc::Rc;
+use std::time::Instant;
 
 use crate::opcode::Op;
 use crate::value::{Class, Function, Instance, Value};
@@ -18,19 +19,79 @@ pub struct Vm {
     frames: Vec<Frame>,
     globals: HashMap<String, Value>,
     out: String,
+    echo: bool,                  // print to real stdout live (CLI) vs capture-only (server)
+    inputs: Option<VecDeque<String>>, // preloaded stdin lines (server); None = read real stdin
+    instr_budget: u64,           // 0 = unlimited
+    instr_count: u64,
+    time_limit_ms: u64,          // 0 = unlimited
+    deadline: Option<Instant>,
 }
 
 impl Vm {
     pub fn new() -> Self {
-        Vm { stack: Vec::new(), frames: Vec::new(), globals: HashMap::new(), out: String::new() }
+        Vm {
+            stack: Vec::new(),
+            frames: Vec::new(),
+            globals: HashMap::new(),
+            out: String::new(),
+            echo: true,
+            inputs: None,
+            instr_budget: 0,
+            instr_count: 0,
+            time_limit_ms: 0,
+            deadline: None,
+        }
     }
 
-    /// Runs `main`, returning everything printed (also echoed to stdout live).
+    /// A sandboxed VM: capture-only output, fixed stdin, instruction + time limits.
+    pub fn sandboxed(stdin: &str, instr_budget: u64, time_limit_ms: u64) -> Self {
+        let mut vm = Vm::new();
+        vm.echo = false;
+        vm.instr_budget = instr_budget;
+        vm.time_limit_ms = time_limit_ms;
+        let lines: VecDeque<String> = if stdin.is_empty() {
+            VecDeque::new()
+        } else {
+            stdin.split('\n').map(|s| s.to_string()).collect()
+        };
+        vm.inputs = Some(lines);
+        vm
+    }
+
+    /// Runs `main`, returning everything printed (also echoed to stdout live in CLI mode).
     pub fn run(&mut self, main: Function) -> Result<String, String> {
-        let main = Rc::new(main);
-        self.frames.push(Frame { func: main, ip: 0, base: 0 });
-        self.exec()?;
-        Ok(std::mem::take(&mut self.out))
+        match self.run_collect(main) {
+            (out, None) => Ok(out),
+            (_, Some(err)) => Err(err),
+        }
+    }
+
+    /// Runs `main`, always returning captured output plus an optional error.
+    /// Used by the Compiler API so partial output before a fault is preserved.
+    pub fn run_collect(&mut self, main: Function) -> (String, Option<String>) {
+        if self.time_limit_ms > 0 {
+            self.deadline =
+                Some(Instant::now() + std::time::Duration::from_millis(self.time_limit_ms));
+        }
+        self.frames.push(Frame { func: Rc::new(main), ip: 0, base: 0 });
+        let err = self.exec().err();
+        (std::mem::take(&mut self.out), err)
+    }
+
+    fn read_input(&mut self) -> Value {
+        if let Some(q) = self.inputs.as_mut() {
+            return match q.pop_front() {
+                Some(s) => Value::Str(Rc::new(s)),
+                None => Value::Null,
+            };
+        }
+        use std::io::BufRead;
+        let mut line = String::new();
+        match std::io::stdin().lock().read_line(&mut line) {
+            Ok(0) => Value::Null,
+            Ok(_) => Value::Str(Rc::new(line.trim_end_matches(['\n', '\r']).to_string())),
+            Err(_) => Value::Null,
+        }
     }
 
     fn rt_err(&self, msg: impl Into<String>) -> String {
@@ -58,6 +119,15 @@ impl Vm {
 
     fn exec(&mut self) -> Result<(), String> {
         loop {
+            self.instr_count += 1;
+            if self.instr_budget != 0 && self.instr_count > self.instr_budget {
+                return Err(self.rt_err("execution exceeded instruction budget"));
+            }
+            if let Some(dl) = self.deadline {
+                if self.instr_count & 8191 == 0 && Instant::now() > dl {
+                    return Err(self.rt_err("execution timed out"));
+                }
+            }
             let fi = self.frames.len() - 1;
             let ip = self.frames[fi].ip;
             let op = self.frames[fi].func.chunk.code[ip].clone();
@@ -156,7 +226,9 @@ impl Vm {
                     let parts: Vec<String> =
                         self.stack.drain(start..).map(|v| v.to_string()).collect();
                     let line = parts.join(" ");
-                    println!("{}", line);
+                    if self.echo {
+                        println!("{}", line);
+                    }
                     self.out.push_str(&line);
                     self.out.push('\n');
                     self.stack.push(Value::Null);
@@ -281,10 +353,18 @@ impl Vm {
                     }
                 }
                 Op::Native(id, argc) => {
-                    let start = self.stack.len() - argc;
-                    let args: Vec<Value> = self.stack.drain(start..).collect();
-                    let result = self.call_native(id, args)?;
-                    self.stack.push(result);
+                    if id == 16 {
+                        // input(): pull from preloaded stdin (server) or real stdin (CLI)
+                        let start = self.stack.len() - argc;
+                        self.stack.truncate(start); // discard any stray args
+                        let v = self.read_input();
+                        self.stack.push(v);
+                    } else {
+                        let start = self.stack.len() - argc;
+                        let args: Vec<Value> = self.stack.drain(start..).collect();
+                        let result = self.call_native(id, args)?;
+                        self.stack.push(result);
+                    }
                 }
                 Op::Call(argc) => {
                     let callee_idx = self.stack.len() - argc - 1;
@@ -676,22 +756,7 @@ impl Vm {
                 nargs(1, "type")?;
                 Ok(Value::Str(Rc::new(args[0].type_name().to_string())))
             }
-            16 => {
-                // input(): read one line from stdin; null at EOF
-                nargs(0, "input")?;
-                use std::io::BufRead;
-                let mut line = String::new();
-                let n = std::io::stdin()
-                    .lock()
-                    .read_line(&mut line)
-                    .map_err(|e| self.rt_err(format!("input() failed: {}", e)))?;
-                if n == 0 {
-                    Ok(Value::Null)
-                } else {
-                    let trimmed = line.trim_end_matches(['\n', '\r']);
-                    Ok(Value::Str(Rc::new(trimmed.to_string())))
-                }
-            }
+            // 16 (input) is handled directly in the exec loop via read_input().
             _ => Err(self.rt_err(format!("unknown native function #{}", id))),
         }
     }

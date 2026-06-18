@@ -8,6 +8,16 @@ All notable changes to the Vyro Ecosystem are documented here. Format based on [
 - Analyzed existing repos (VyroCoding, VyroOs) and re-based the plan on reality: VyroCoding is the built IDE/Cloud/AI platform (evolve, not rebuild); VyroOs is a built OS (reference). Updated Component Map statuses and Dependency Graph reuse mapping.
 
 ### Added
+- **Self-contained Vyro stack (the architecture diagram, in this repo):**
+  - `impl/src/server.rs` — zero-dependency **Compiler API** (`vyro serve`): `GET /`,
+    `/health`, `POST /api/run`, `POST /api/compile`.
+  - `impl/web/index.html` — your own **VyroIDE** (editor, examples, stdin, console,
+    Ctrl+Enter to run), embedded into the binary.
+  - **Sandboxed VyroVM**: per-request instruction budget (50M) + wall-clock deadline
+    (5s), captured stdout, request-fed `input()` (no host stdio). New `Vm::sandboxed`.
+  - **Docker Sandbox**: `impl/Dockerfile` + `impl/scripts/sandbox-run.sh` (CPU/RAM/PID
+    limits, read-only fs, cap-drop, non-root).
+  - `docs/01-architecture/STANDALONE_STACK.md` — box → code mapping for the diagram.
 - **VyroLang runs in VyroCoding on the native VyroVM** (Judge0 bypassed for `.vy`):
   added an `input()` native to the language; added a Vyro execution service +
   language dispatcher in VyroCoding's API (`Language.Vyro`, `runner.service.ts`,

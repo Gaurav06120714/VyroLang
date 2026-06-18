@@ -5,6 +5,7 @@ pub mod compiler;
 pub mod lexer;
 pub mod opcode;
 pub mod parser;
+pub mod server;
 pub mod token;
 pub mod value;
 pub mod vm;

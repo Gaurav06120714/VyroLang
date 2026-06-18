@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>VyroIDE</title>
+<style>
+  :root{
+    --bg:#0c0e14; --panel:#11141d; --panel2:#161a25; --border:#222838;
+    --fg:#cfe3d8; --muted:#7d8aa0; --accent:#00d4ff; --accent2:#7f77dd;
+    --ok:#3ad29f; --err:#ff6b6b; --kw:#b3a7f0; --str:#e6b873; --com:#6f8f7d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  header{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+  header .logo{font-weight:700;color:#fff;letter-spacing:.5px}
+  header .pill{font-size:12px;padding:3px 10px;border-radius:6px;background:#0e2230;color:var(--accent);border:1px solid #14384a}
+  header .spacer{flex:1}
+  button{font:inherit;color:#04121a;background:var(--accent);border:0;padding:8px 16px;border-radius:6px;cursor:pointer;font-weight:600}
+  button:active{transform:scale(.98)}
+  button.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .wrap{display:grid;grid-template-columns:150px 1fr;gap:0;height:calc(100vh - 53px)}
+  .files{border-right:1px solid var(--border);background:var(--panel);padding:8px;overflow:auto}
+  .files .f{padding:6px 8px;border-radius:6px;cursor:pointer;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .files .f:hover{background:var(--panel2)}
+  .files .f.active{background:#0e2230;color:var(--accent)}
+  .main{display:flex;flex-direction:column;min-width:0}
+  .editorwrap{flex:1;display:flex;flex-direction:column;min-height:0}
+  textarea{flex:1;width:100%;resize:none;background:var(--panel2);color:var(--fg);border:0;padding:14px 16px;font:13px/1.6 ui-monospace,Menlo,monospace;outline:none;tab-size:4}
+  .io{display:grid;grid-template-rows:auto 1fr;border-top:1px solid var(--border);max-height:42%}
+  .bar{display:flex;align-items:center;gap:10px;padding:6px 14px;background:var(--panel);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+  .bar .status{margin-left:auto;font-weight:600}
+  .panes{display:grid;grid-template-columns:200px 1fr;min-height:120px}
+  .stdin{display:flex;flex-direction:column;border-right:1px solid var(--border)}
+  .stdin label{padding:6px 12px;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .stdin textarea{background:var(--panel);font-size:12.5px;padding:6px 12px}
+  pre.out{margin:0;padding:12px 16px;overflow:auto;white-space:pre-wrap;color:var(--fg);background:var(--bg)}
+  .s-ok{color:var(--ok)} .s-err{color:var(--err)}
+</style>
+</head>
+<body>
+<header>
+  <span class="logo">⚡ VyroIDE</span>
+  <span class="pill">VyroLang 0.1 · VyroVM</span>
+  <span class="spacer"></span>
+  <span id="time" style="color:var(--muted);font-size:12px"></span>
+  <button class="ghost" id="checkBtn">Check</button>
+  <button id="runBtn">▶ Run</button>
+</header>
+<div class="wrap">
+  <div class="files" id="files"></div>
+  <div class="main">
+    <div class="editorwrap">
+      <textarea id="code" spellcheck="false"></textarea>
+    </div>
+    <div class="io">
+      <div class="bar">
+        <span>Console</span>
+        <span class="status" id="status"></span>
+      </div>
+      <div class="panes">
+        <div class="stdin">
+          <label>stdin</label>
+          <textarea id="stdin" spellcheck="false" placeholder="one value per line"></textarea>
+        </div>
+        <pre class="out" id="out">Pick an example or write VyroLang, then press Run.</pre>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+const EXAMPLES = {
+  "hello.vy": 'print("Hello, Vyro!")\n\nlet name = "Gaurav"\nlet age = 20\nif age > 18 {\n    print(name + " is an Adult")\n}',
+  "fib.vy": 'func fib(n) {\n    if n < 2 { return n }\n    return fib(n - 1) + fib(n - 2)\n}\nfor i in 0..10 {\n    print("fib(" + i + ") =", fib(i))\n}',
+  "classes.vy": 'class Counter {\n    func init() { self.n = 0 }\n    func inc() { self.n = self.n + 1 }\n}\nlet c = Counter()\nc.inc()\nc.inc()\nc.inc()\nprint("count:", c.n)',
+  "arrays.vy": 'let xs = [5, 10, 15, 20]\nlet total = 0\nfor i in 0..len(xs) {\n    total = total + xs[i]\n}\nprint("sum:", total)\nprint("max:", max(xs[0], xs[1], xs[2], xs[3]))',
+  "stdin.vy": '// type two numbers into the stdin box\nlet a = int(input())\nlet b = int(input())\nprint(a + b)'
+};
+const files = document.getElementById('files');
+const codeEl = document.getElementById('code');
+const stdinEl = document.getElementById('stdin');
+const outEl = document.getElementById('out');
+const statusEl = document.getElementById('status');
+const timeEl = document.getElementById('time');
+let current = 'hello.vy';
+
+function renderFiles(){
+  files.innerHTML = '';
+  Object.keys(EXAMPLES).forEach(name=>{
+    const d = document.createElement('div');
+    d.className = 'f' + (name===current?' active':'');
+    d.textContent = name;
+    d.onclick = ()=>{ current=name; codeEl.value=EXAMPLES[name]; stdinEl.value = name==='stdin.vy'?'5\n7':''; renderFiles(); };
+    files.appendChild(d);
+  });
+}
+async function run(){
+  statusEl.textContent='running…'; statusEl.className='status'; timeEl.textContent='';
+  outEl.textContent='';
+  try{
+    const r = await fetch('/api/run',{method:'POST',headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({code: codeEl.value, stdin: stdinEl.value})});
+    const j = await r.json();
+    outEl.textContent = (j.stdout||'') + (j.error?('\n'+j.error):'');
+    statusEl.textContent = j.status.replace(/_/g,' ');
+    statusEl.className = 'status ' + (j.ok?'s-ok':'s-err');
+    if(j.timeMs!=null) timeEl.textContent = j.timeMs+'ms';
+  }catch(e){ outEl.textContent='request failed: '+e; statusEl.textContent='error'; statusEl.className='status s-err'; }
+}
+async function check(){
+  const r = await fetch('/api/compile',{method:'POST',headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({code: codeEl.value})});
+  const j = await r.json();
+  outEl.textContent = j.ok ? '✓ compiles cleanly' : j.error;
+  statusEl.textContent = j.status.replace(/_/g,' ');
+  statusEl.className = 'status ' + (j.ok?'s-ok':'s-err');
+}
+document.getElementById('runBtn').onclick = run;
+document.getElementById('checkBtn').onclick = check;
+codeEl.addEventListener('keydown', e=>{
+  if((e.metaKey||e.ctrlKey) && e.key==='Enter'){ e.preventDefault(); run(); }
+  if(e.key==='Tab'){ e.preventDefault(); const s=codeEl.selectionStart; codeEl.value=codeEl.value.slice(0,s)+'    '+codeEl.value.slice(codeEl.selectionEnd); codeEl.selectionStart=codeEl.selectionEnd=s+4; }
+});
+renderFiles();
+codeEl.value = EXAMPLES[current];
+</script>
+</body>
+</html>

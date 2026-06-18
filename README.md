@@ -59,7 +59,7 @@ Full diagrams: [System Architecture](./docs/01-architecture/SYSTEM_ARCHITECTURE.
 ## Documentation Index
 
 - **Overview** — [Ecosystem](./docs/00-overview/ECOSYSTEM.md) · [Vision](./docs/00-overview/VISION.md) · [Glossary](./docs/00-overview/GLOSSARY.md) · [Existing Repo Analysis](./docs/00-overview/EXISTING_REPO_ANALYSIS.md)
-- **Architecture** — [System](./docs/01-architecture/SYSTEM_ARCHITECTURE.md) · [Components](./docs/01-architecture/COMPONENT_MAP.md) · [Dependencies](./docs/01-architecture/DEPENDENCY_GRAPH.md) · [Scalability](./docs/01-architecture/SCALABILITY.md)
+- **Architecture** — [Standalone Stack](./docs/01-architecture/STANDALONE_STACK.md) · [System](./docs/01-architecture/SYSTEM_ARCHITECTURE.md) · [Components](./docs/01-architecture/COMPONENT_MAP.md) · [Dependencies](./docs/01-architecture/DEPENDENCY_GRAPH.md) · [Scalability](./docs/01-architecture/SCALABILITY.md)
 - **Language** — [VyroLang Spec](./docs/02-vyrolang/LANGUAGE_SPEC.md)
 - **Compiler** — [Compiler Design](./docs/03-compiler/COMPILER_DESIGN.md)
 - **VM** — [VM Design](./docs/04-vm/VM_DESIGN.md)
@@ -88,7 +88,13 @@ Engineering rules and conventions: [CONTRIBUTING](./CONTRIBUTING.md) · [Securit
 
 ## Status
 
-**Phase 2 — Toolchain in progress.** Architecture and specs are complete, and a **first working Vyro toolchain** (lexer → parser → bytecode compiler → stack VM) now lives in [`impl/`](./impl) — run real programs with `vyro run examples/hello.vy`. See the [implementation README](./impl/README.md). Milestones tracked in [ROADMAP.md](./ROADMAP.md).
+**Phase 2 — Self-contained stack working.** The architecture diagram is realized end-to-end in [`impl/`](./impl): your own **VyroIDE → Compiler API → VyroCompiler → Bytecode → VyroVM**, with a sandboxed runtime and a Docker sandbox image. Run the whole thing locally:
+
+```bash
+cd impl && cargo run --release -- serve 8787   # open http://localhost:8787
+```
+
+See the [Standalone Stack](./docs/01-architecture/STANDALONE_STACK.md) doc (box → code mapping) and the [implementation README](./impl/README.md). Milestones tracked in [ROADMAP.md](./ROADMAP.md).
 
 ---
 
