@@ -18,6 +18,7 @@ pub enum Tok {
     While,
     For,
     In,
+    Match,
     Return,
     True,
     False,

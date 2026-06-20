@@ -175,3 +175,83 @@ fn method_arity_error() {
     .unwrap_err();
     assert!(err.contains("expects 1 argument"), "got: {}", err);
 }
+
+// ---- Maps ----
+
+#[test]
+fn map_literal_get_set() {
+    let out = run(r#"
+        let m = { "a": 1, "b": 2 }
+        print(m["a"], m["b"])
+        m["c"] = 3
+        print(m["c"])
+        print(len(m))
+    "#);
+    assert_eq!(out, "1 2\n3\n3\n");
+}
+
+#[test]
+fn map_missing_key_is_null_and_has() {
+    let out = run(r#"
+        let m = { "x": 10 }
+        print(m["y"])
+        print(has(m, "x"), has(m, "y"))
+    "#);
+    assert_eq!(out, "null\ntrue false\n");
+}
+
+#[test]
+fn map_keys_iteration() {
+    let out = run(r#"
+        let m = { "a": 1, "b": 2, "c": 3 }
+        let ks = keys(m)
+        let total = 0
+        for i in 0..len(ks) {
+            total = total + m[ks[i]]
+        }
+        print(total)
+    "#);
+    assert_eq!(out, "6\n");
+}
+
+// ---- match ----
+
+#[test]
+fn match_literal_arms() {
+    let out = run(r#"
+        func name(n) {
+            return match n {
+                1 -> "one"
+                2 -> "two"
+                _ -> "many"
+            }
+        }
+        print(name(1))
+        print(name(2))
+        print(name(9))
+    "#);
+    assert_eq!(out, "one\ntwo\nmany\n");
+}
+
+#[test]
+fn match_string_subject() {
+    let out = run(r#"
+        let cmd = "stop"
+        let code = match cmd {
+            "go" -> 1
+            "stop" -> 0
+            _ -> -1
+        }
+        print(code)
+    "#);
+    assert_eq!(out, "0\n");
+}
+
+#[test]
+fn match_no_wildcard_falls_to_null() {
+    let out = run(r#"
+        let r = match 5 { 1 -> "a" 2 -> "b" }
+        print(r)
+    "#);
+    assert_eq!(out, "null\n");
+}

@@ -9,6 +9,8 @@ pub enum Expr {
     Null,
     Var(String),
     Array(Vec<Expr>),
+    Map(Vec<(Expr, Expr)>),
+    Match { subject: Box<Expr>, arms: Vec<(Option<Expr>, Expr)> },
     Index { obj: Box<Expr>, index: Box<Expr> },
     Get { obj: Box<Expr>, name: String },
     Unary { op: UnOp, expr: Box<Expr> },

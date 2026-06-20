@@ -44,6 +44,8 @@ fn native_id(name: &str) -> Option<usize> {
         "lower" => 14,
         "type" => 15,
         "input" => 16,
+        "keys" => 17,
+        "has" => 18,
         _ => return None,
     })
 }
@@ -389,6 +391,46 @@ impl Compiler {
                     self.expr(el)?;
                 }
                 self.emit(Op::NewArray(elems.len()));
+            }
+            Expr::Map(pairs) => {
+                for (k, v) in pairs {
+                    self.expr(k)?;
+                    self.expr(v)?;
+                }
+                self.emit(Op::NewMap(pairs.len()));
+            }
+            Expr::Match { subject, arms } => {
+                self.expr(subject)?; // [subj]
+                let mut end_jumps = Vec::new();
+                let mut has_wild = false;
+                for (pat, body) in arms {
+                    match pat {
+                        Some(p) => {
+                            self.emit(Op::Dup);
+                            self.expr(p)?;
+                            self.emit(Op::Eq);
+                            let next = self.emit(Op::JumpIfFalse(0)); // pops bool
+                            self.emit(Op::Pop); // drop subject
+                            self.expr(body)?;
+                            end_jumps.push(self.emit(Op::Jump(0)));
+                            self.patch(next);
+                        }
+                        None => {
+                            has_wild = true;
+                            self.emit(Op::Pop); // drop subject
+                            self.expr(body)?;
+                            end_jumps.push(self.emit(Op::Jump(0)));
+                            break; // wildcard is terminal
+                        }
+                    }
+                }
+                if !has_wild {
+                    self.emit(Op::Pop); // no arm matched: drop subject
+                    self.emit(Op::Null);
+                }
+                for j in end_jumps {
+                    self.patch(j);
+                }
             }
             Expr::Index { obj, index } => {
                 self.expr(obj)?;

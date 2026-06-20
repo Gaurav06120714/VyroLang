@@ -10,6 +10,7 @@ pub enum Op {
     False,
     Null,
     Pop,
+    Dup, // push a copy of the top of stack
 
     // Variables
     DefineGlobal(usize), // name index in constants
@@ -43,8 +44,9 @@ pub enum Op {
 
     // Collections
     NewArray(usize), // pop n elements, push an array
-    IndexGet,        // arr, idx -> value
-    IndexSet,        // arr, idx, value -> value (value left on stack)
+    NewMap(usize),   // pop n key/value pairs (2n values), push a map
+    IndexGet,        // arr|map, idx|key -> value
+    IndexSet,        // arr|map, idx|key, value -> value (value left on stack)
 
     // Objects / classes
     Class(usize),    // name const -> push empty class

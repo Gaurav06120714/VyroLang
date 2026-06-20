@@ -68,10 +68,13 @@ The parser is recursive-descent with precedence-climbing for expressions. The co
 - Control flow: `if / else if / else`, `while`, `for i in a..b`.
 - Functions with parameters, recursion, `return`; first-class function values.
 - **Arrays**: literals `[1, 2, 3]`, indexing `a[i]`, index assignment `a[i] = x`.
+- **Maps**: literals `{ "a": 1 }`, `m[key]` get/set (missing key → `null`), with
+  `len`, `keys(m)`, `has(m, key)`.
+- **`match` expression**: `match x { 1 -> "a"  _ -> "b" }` with literal patterns + `_`.
 - **Classes**: fields, `init`, methods, `self`, instantiation `User(...)`, property
   get/set, and method calls (including method-to-method via `self.m()`).
-- **Standard library** (built-ins): `print`, `len`, `push`, `pop`, `str`, `int`,
-  `float`, `abs`, `sqrt`, `floor`, `ceil`, `pow`, `min`, `max`, `upper`, `lower`, `type`,
+- **Standard library** (built-ins): `print`, `len`, `push`, `pop`, `keys`, `has`, `str`,
+  `int`, `float`, `abs`, `sqrt`, `floor`, `ceil`, `pow`, `min`, `max`, `upper`, `lower`, `type`,
   and `input()` (reads one line from stdin; `null` at EOF — used for competitive I/O
   and by the [VyroCoding integration](../docs/10-cloud/VYROCODING_INTEGRATION.md)).
 - String indexing (`"hi"[0]`) and `len` on strings.

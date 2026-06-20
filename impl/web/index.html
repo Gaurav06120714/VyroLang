@@ -74,6 +74,8 @@ const EXAMPLES = {
   "fib.vy": 'func fib(n) {\n    if n < 2 { return n }\n    return fib(n - 1) + fib(n - 2)\n}\nfor i in 0..10 {\n    print("fib(" + i + ") =", fib(i))\n}',
   "classes.vy": 'class Counter {\n    func init() { self.n = 0 }\n    func inc() { self.n = self.n + 1 }\n}\nlet c = Counter()\nc.inc()\nc.inc()\nc.inc()\nprint("count:", c.n)',
   "arrays.vy": 'let xs = [5, 10, 15, 20]\nlet total = 0\nfor i in 0..len(xs) {\n    total = total + xs[i]\n}\nprint("sum:", total)\nprint("max:", max(xs[0], xs[1], xs[2], xs[3]))',
+  "maps.vy": 'let user = { "name": "Gaurav", "age": 20 }\nuser["role"] = "founder"\nfor i in 0..len(keys(user)) {\n    let k = keys(user)[i]\n    print(k + ": " + str(user[k]))\n}\nprint("has email?", has(user, "email"))',
+  "match.vy": 'func grade(score) {\n    return match score {\n        100 -> "perfect"\n        0 -> "zero"\n        _ -> "in between"\n    }\n}\nfor s in 0..3 {\n    print(s, "->", grade(s * 50))\n}',
   "stdin.vy": '// type two numbers into the stdin box\nlet a = int(input())\nlet b = int(input())\nprint(a + b)'
 };
 const files = document.getElementById('files');

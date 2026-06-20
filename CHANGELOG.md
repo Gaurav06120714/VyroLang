@@ -8,6 +8,10 @@ All notable changes to the Vyro Ecosystem are documented here. Format based on [
 - Analyzed existing repos (VyroCoding, VyroOs) and re-based the plan on reality: VyroCoding is the built IDE/Cloud/AI platform (evolve, not rebuild); VyroOs is a built OS (reference). Updated Component Map statuses and Dependency Graph reuse mapping.
 
 ### Added
+- **Maps and `match`:** map literals `{ "a": 1 }` with `m[key]` get/set (missing →
+  `null`), `keys(m)`, `has(m, key)`, and `len` on maps; a `match` expression with
+  literal patterns and `_` wildcard. New opcodes `Dup`/`NewMap`, `Value::Map`. Tests
+  in `tests/features.rs` (31 total). New `examples/maps_match.vy` and IDE examples.
 - **Self-contained Vyro stack (the architecture diagram, in this repo):**
   - `impl/src/server.rs` — zero-dependency **Compiler API** (`vyro serve`): `GET /`,
     `/health`, `POST /api/run`, `POST /api/compile`.

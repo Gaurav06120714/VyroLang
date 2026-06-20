@@ -375,6 +375,26 @@ impl Parser {
         Ok(e)
     }
 
+    fn match_expr(&mut self) -> Result<Expr, String> {
+        let subject = self.expression()?;
+        self.expect(&Tok::LBrace, "'{'")?;
+        let mut arms = Vec::new();
+        while !self.check(&Tok::RBrace) && !self.check(&Tok::Eof) {
+            let pat = if matches!(self.peek(), Tok::Ident(s) if s == "_") {
+                self.advance();
+                None
+            } else {
+                Some(self.expression()?)
+            };
+            self.expect(&Tok::Arrow, "'->'")?;
+            let body = self.expression()?;
+            arms.push((pat, body));
+            self.accept(&Tok::Comma);
+        }
+        self.expect(&Tok::RBrace, "'}'")?;
+        Ok(Expr::Match { subject: Box::new(subject), arms })
+    }
+
     fn atom(&mut self) -> Result<Expr, String> {
         match self.advance() {
             Tok::Int(n) => Ok(Expr::Int(n)),
@@ -401,6 +421,23 @@ impl Parser {
                 self.expect(&Tok::RBracket, "']'")?;
                 Ok(Expr::Array(elems))
             }
+            Tok::LBrace => {
+                let mut pairs = Vec::new();
+                if !self.check(&Tok::RBrace) {
+                    loop {
+                        let key = self.expression()?;
+                        self.expect(&Tok::Colon, "':'")?;
+                        let value = self.expression()?;
+                        pairs.push((key, value));
+                        if !self.accept(&Tok::Comma) {
+                            break;
+                        }
+                    }
+                }
+                self.expect(&Tok::RBrace, "'}'")?;
+                Ok(Expr::Map(pairs))
+            }
+            Tok::Match => self.match_expr(),
             Tok::Ident(name) => {
                 if self.accept(&Tok::LParen) {
                     let mut args = Vec::new();

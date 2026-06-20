@@ -14,6 +14,7 @@ pub enum Value {
     Bool(bool),
     Str(Rc<String>),
     Array(Rc<RefCell<Vec<Value>>>),
+    Map(Rc<RefCell<std::collections::BTreeMap<String, Value>>>),
     Func(Rc<Function>),
     Class(Rc<Class>),
     Instance(Rc<RefCell<Instance>>),
@@ -45,6 +46,7 @@ impl Value {
             Value::Float(f) => *f != 0.0,
             Value::Str(s) => !s.is_empty(),
             Value::Array(a) => !a.borrow().is_empty(),
+            Value::Map(m) => !m.borrow().is_empty(),
             Value::Func(_) | Value::Class(_) | Value::Instance(_) => true,
         }
     }
@@ -56,6 +58,7 @@ impl Value {
             Value::Bool(_) => "Bool",
             Value::Str(_) => "String",
             Value::Array(_) => "Array",
+            Value::Map(_) => "Map",
             Value::Func(_) => "Function",
             Value::Class(_) => "Class",
             Value::Instance(_) => "instance",
@@ -81,6 +84,12 @@ impl fmt::Display for Value {
                 let items = a.borrow();
                 let parts: Vec<String> = items.iter().map(render_elem).collect();
                 write!(f, "[{}]", parts.join(", "))
+            }
+            Value::Map(m) => {
+                let items = m.borrow();
+                let parts: Vec<String> =
+                    items.iter().map(|(k, v)| format!("\"{}\": {}", k, render_elem(v))).collect();
+                write!(f, "{{{}}}", parts.join(", "))
             }
             Value::Func(func) => write!(f, "<func {}>", func.name),
             Value::Class(c) => write!(f, "<class {}>", c.name),
@@ -108,6 +117,7 @@ impl PartialEq for Value {
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Str(a), Value::Str(b)) => a == b,
             (Value::Array(a), Value::Array(b)) => *a.borrow() == *b.borrow(),
+            (Value::Map(a), Value::Map(b)) => *a.borrow() == *b.borrow(),
             (Value::Instance(a), Value::Instance(b)) => Rc::ptr_eq(a, b),
             (Value::Class(a), Value::Class(b)) => Rc::ptr_eq(a, b),
             (Value::Func(a), Value::Func(b)) => Rc::ptr_eq(a, b),

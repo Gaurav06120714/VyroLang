@@ -156,6 +156,7 @@ impl<'a> Lexer<'a> {
             "while" => Tok::While,
             "for" => Tok::For,
             "in" => Tok::In,
+            "match" => Tok::Match,
             "return" => Tok::Return,
             "true" => Tok::True,
             "false" => Tok::False,

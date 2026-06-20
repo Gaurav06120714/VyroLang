@@ -1,7 +1,7 @@
 //! The VyroVM: a stack-based bytecode interpreter with call frames.
 
 use std::cell::RefCell;
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::rc::Rc;
 use std::time::Instant;
 
@@ -144,6 +144,9 @@ impl Vm {
                 Op::Pop => {
                     self.pop();
                 }
+                Op::Dup => {
+                    self.stack.push(self.peek().clone());
+                }
                 Op::DefineGlobal(i) => {
                     let name = self.name_const(i);
                     let v = self.pop();
@@ -237,6 +240,16 @@ impl Vm {
                     let start = self.stack.len() - n;
                     let elems: Vec<Value> = self.stack.drain(start..).collect();
                     self.stack.push(Value::Array(Rc::new(RefCell::new(elems))));
+                }
+                Op::NewMap(n) => {
+                    let start = self.stack.len() - 2 * n;
+                    let flat: Vec<Value> = self.stack.drain(start..).collect();
+                    let mut map = BTreeMap::new();
+                    let mut it = flat.into_iter();
+                    while let (Some(k), Some(v)) = (it.next(), it.next()) {
+                        map.insert(k.to_string(), v);
+                    }
+                    self.stack.push(Value::Map(Rc::new(RefCell::new(map))));
                 }
                 Op::IndexGet => {
                     let idx = self.pop();
@@ -564,6 +577,10 @@ impl Vm {
     }
 
     fn index_get(&self, obj: &Value, idx: &Value) -> Result<Value, String> {
+        if let Value::Map(m) = obj {
+            // missing key -> null (use has() to distinguish)
+            return Ok(m.borrow().get(&idx.to_string()).cloned().unwrap_or(Value::Null));
+        }
         let i = self.as_index(idx)?;
         match obj {
             Value::Array(a) => {
@@ -582,6 +599,10 @@ impl Vm {
     }
 
     fn index_set(&self, obj: &Value, idx: &Value, val: Value) -> Result<(), String> {
+        if let Value::Map(m) = obj {
+            m.borrow_mut().insert(idx.to_string(), val);
+            return Ok(());
+        }
         let i = self.as_index(idx)?;
         match obj {
             Value::Array(a) => {
@@ -623,8 +644,9 @@ impl Vm {
                 nargs(1, "len")?;
                 match &args[0] {
                     Value::Array(a) => Ok(Value::Int(a.borrow().len() as i64)),
+                    Value::Map(m) => Ok(Value::Int(m.borrow().len() as i64)),
                     Value::Str(s) => Ok(Value::Int(s.chars().count() as i64)),
-                    other => Err(self.rt_err(format!("len() needs Array or String, got {}", other.type_name()))),
+                    other => Err(self.rt_err(format!("len() needs Array, Map, or String, got {}", other.type_name()))),
                 }
             }
             1 => {
@@ -757,6 +779,26 @@ impl Vm {
                 Ok(Value::Str(Rc::new(args[0].type_name().to_string())))
             }
             // 16 (input) is handled directly in the exec loop via read_input().
+            17 => {
+                // keys(map) -> array of key strings
+                nargs(1, "keys")?;
+                match &args[0] {
+                    Value::Map(m) => {
+                        let ks: Vec<Value> =
+                            m.borrow().keys().map(|k| Value::Str(Rc::new(k.clone()))).collect();
+                        Ok(Value::Array(Rc::new(RefCell::new(ks))))
+                    }
+                    other => Err(self.rt_err(format!("keys() needs a Map, got {}", other.type_name()))),
+                }
+            }
+            18 => {
+                // has(map, key) -> bool
+                nargs(2, "has")?;
+                match &args[0] {
+                    Value::Map(m) => Ok(Value::Bool(m.borrow().contains_key(&args[1].to_string()))),
+                    other => Err(self.rt_err(format!("has() needs a Map, got {}", other.type_name()))),
+                }
+            }
             _ => Err(self.rt_err(format!("unknown native function #{}", id))),
         }
     }
