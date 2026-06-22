@@ -255,3 +255,15 @@ fn match_no_wildcard_falls_to_null() {
     "#);
     assert_eq!(out, "null\n");
 }
+
+#[test]
+fn map_del_removes_key() {
+    let out = run(r#"
+        let m = { "a": 1, "b": 2 }
+        let removed = del(m, "a")
+        print(removed)
+        print(has(m, "a"))
+        print(len(m))
+    "#);
+    assert_eq!(out, "1\nfalse\n1\n");
+}

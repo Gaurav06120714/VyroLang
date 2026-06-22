@@ -69,7 +69,7 @@ The parser is recursive-descent with precedence-climbing for expressions. The co
 - Functions with parameters, recursion, `return`; first-class function values.
 - **Arrays**: literals `[1, 2, 3]`, indexing `a[i]`, index assignment `a[i] = x`.
 - **Maps**: literals `{ "a": 1 }`, `m[key]` get/set (missing key → `null`), with
-  `len`, `keys(m)`, `has(m, key)`.
+  `len`, `keys(m)`, `has(m, key)`, `del(m, key)`.
 - **`match` expression**: `match x { 1 -> "a"  _ -> "b" }` with literal patterns + `_`.
 - **Classes**: fields, `init`, methods, `self`, instantiation `User(...)`, property
   get/set, and method calls (including method-to-method via `self.m()`).

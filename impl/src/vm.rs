@@ -799,6 +799,14 @@ impl Vm {
                     other => Err(self.rt_err(format!("has() needs a Map, got {}", other.type_name()))),
                 }
             }
+            19 => {
+                // del(map, key) -> removed value, or null if absent
+                nargs(2, "del")?;
+                match &args[0] {
+                    Value::Map(m) => Ok(m.borrow_mut().remove(&args[1].to_string()).unwrap_or(Value::Null)),
+                    other => Err(self.rt_err(format!("del() needs a Map, got {}", other.type_name()))),
+                }
+            }
             _ => Err(self.rt_err(format!("unknown native function #{}", id))),
         }
     }
